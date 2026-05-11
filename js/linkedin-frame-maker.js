@@ -1,115 +1,116 @@
-const imageInput = document.getElementById("imageInput");
-const downloadBtn = document.getElementById("downloadBtn");
-const zoomSlider = document.getElementById("zoomSlider");
-const textInput = document.getElementById("textInput");
-const fileUploadBtnLabel = document.querySelector(".file-upload-btn");
-
-// Modal Elements
-const openColorModalBtn = document.getElementById("openColorModalBtn");
-const closeModalBtn = document.getElementById("closeModalBtn");
-const applyModalBtn = document.getElementById("applyModalBtn");
-const undoModalBtn = document.getElementById("undoModalBtn");
-const colorModal = document.getElementById("colorModal");
-const textColorPicker = document.getElementById("textColorPicker");
-const textColorLabel = document.getElementById("textColorLabel");
-const textColorRow = document.getElementById("textColorRow");
-const ribbonColorsList = document.getElementById("ribbonColorsList");
-const addRibbonColorBtn = document.getElementById("addRibbonColorBtn");
-
-// Variables
-let userImg = null;
-let imgX = 0;
-let imgY = 0;
-let isDragging = false;
-let startX, startY;
-
-// Default Colors
-let ribbonColors = ["#d42426", "#2a9d8f"]; // Red, Teal
-let currentTextColor = "#ffffff";
-let currentHoverBg = "#fff0f0";
-
-// History
-const historyStack = [];
-
-function saveState() {
-    const state = {
-        ribbonColors: [...ribbonColors],
-        textColor: currentTextColor,
-    };
-    historyStack.push(state);
-    updateUndoBtnUI();
-}
-
-function restoreState() {
-    if (historyStack.length === 0) return;
-
-    const previousState = historyStack.pop();
-
-    // Apply state
-    ribbonColors = previousState.ribbonColors;
-    currentTextColor = previousState.textColor;
-
-    // Update UI elements to match new state
-    textColorPicker.value = currentTextColor;
-    textColorLabel.textContent = currentTextColor.toUpperCase();
-
-    // Trigger global refresh
-    if (window.refreshFrameMakerUI) {
-        window.refreshFrameMakerUI();
-    }
-
-    updateUndoBtnUI();
-}
-
-function updateUndoBtnUI() {
-    undoModalBtn.disabled = historyStack.length === 0;
-}
-
-undoModalBtn.addEventListener("click", restoreState);
-
-// Modal
-function toggleModal(show) {
-    if (show) {
-        updateUndoBtnUI();
-
-        colorModal.classList.remove("tw-hidden");
-        setTimeout(() => colorModal.classList.add("open"), 10);
-    } else {
-        colorModal.classList.remove("open");
-        setTimeout(() => colorModal.classList.add("tw-hidden"), 200);
-    }
-}
-
-openColorModalBtn.addEventListener("click", () => toggleModal(true));
-closeModalBtn.addEventListener("click", () => toggleModal(false));
-applyModalBtn.addEventListener("click", () => toggleModal(false));
-
-textColorRow.addEventListener("click", (e) => {
-    if (e.target !== textColorPicker) {
-        textColorPicker.click();
-    }
-});
-
-textColorPicker.addEventListener("click", () => {
-    saveState();
-});
-
-textColorPicker.addEventListener("input", (e) => {
-    currentTextColor = e.target.value;
-    textColorLabel.textContent = currentTextColor.toUpperCase();
-    if (window.redrawFrameMaker) window.redrawFrameMaker();
-});
-
 const sketch = function (p) {
-    window.refreshFrameMakerUI = function () {
+    // UI Elements
+    const imageInput = document.getElementById("imageInput");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const zoomSlider = document.getElementById("zoomSlider");
+    const textInput = document.getElementById("textInput");
+    const fileUploadBtnLabel = document.querySelector(".file-upload-btn");
+
+    // Modal Elements
+    const openColorModalBtn = document.getElementById("openColorModalBtn");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+    const applyModalBtn = document.getElementById("applyModalBtn");
+    const undoModalBtn = document.getElementById("undoModalBtn");
+    const colorModal = document.getElementById("colorModal");
+    const textColorPicker = document.getElementById("textColorPicker");
+    const textColorLabel = document.getElementById("textColorLabel");
+    const textColorRow = document.getElementById("textColorRow");
+    const ribbonColorsList = document.getElementById("ribbonColorsList");
+    const addRibbonColorBtn = document.getElementById("addRibbonColorBtn");
+
+    // Variables
+    let userImg = null;
+    let imgX = 0;
+    let imgY = 0;
+    let isDragging = false;
+    let startX, startY;
+
+    // Default Colors
+    let ribbonColors = ["#d42426", "#2a9d8f"]; // Red, Teal
+    let currentTextColor = "#ffffff";
+    let currentHoverBg = "#fff0f0";
+
+    // History
+    const historyStack = [];
+
+    function saveState() {
+        const state = {
+            ribbonColors: [...ribbonColors],
+            textColor: currentTextColor,
+        };
+        historyStack.push(state);
+        updateUndoBtnUI();
+    }
+
+    function restoreState() {
+        if (historyStack.length === 0) return;
+
+        const previousState = historyStack.pop();
+
+        // Apply state
+        ribbonColors = previousState.ribbonColors;
+        currentTextColor = previousState.textColor;
+
+        // Update UI elements to match new state
+        textColorPicker.value = currentTextColor;
+        textColorLabel.textContent = currentTextColor.toUpperCase();
+
+        // Refresh UI and Canvas
         renderRibbonInputs();
         updateUITheme();
         p.redraw();
-    };
 
-    window.redrawFrameMaker = function () {
-        p.redraw();
-    };
+        updateUndoBtnUI();
+    }
+
+    function updateUndoBtnUI() {
+        undoModalBtn.disabled = historyStack.length === 0;
+    }
+
+    // Modal Logic
+    function toggleModal(show) {
+        if (show) {
+            updateUndoBtnUI();
+            colorModal.classList.remove("tw-hidden");
+            setTimeout(() => {
+                colorModal.classList.add("open");
+                trapFocus(colorModal);
+            }, 10);
+        } else {
+            colorModal.classList.remove("open");
+            setTimeout(() => colorModal.classList.add("tw-hidden"), 200);
+            openColorModalBtn.focus();
+        }
+    }
+
+    function trapFocus(modal) {
+        const focusableElements = modal.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        const firstFocusableElement = focusableElements[0];
+        const lastFocusableElement = focusableElements[focusableElements.length - 1];
+
+        firstFocusableElement.focus();
+
+        modal.addEventListener("keydown", function (e) {
+            if (e.key === "Tab") {
+                if (e.shiftKey) {
+                    if (document.activeElement === firstFocusableElement) {
+                        lastFocusableElement.focus();
+                        e.preventDefault();
+                    }
+                } else {
+                    if (document.activeElement === lastFocusableElement) {
+                        firstFocusableElement.focus();
+                        e.preventDefault();
+                    }
+                }
+            }
+            if (e.key === "Escape") {
+                toggleModal(false);
+            }
+        });
+    }
 
     function updateUITheme() {
         if (ribbonColors.length === 0) return;
@@ -151,28 +152,38 @@ const sketch = function (p) {
         }
     }
 
-    if (fileUploadBtnLabel) {
-        fileUploadBtnLabel.addEventListener("mouseenter", () => {
-            fileUploadBtnLabel.style.backgroundColor = currentHoverBg;
-        });
-        fileUploadBtnLabel.addEventListener("mouseleave", () => {
-            fileUploadBtnLabel.style.backgroundColor = "transparent";
-        });
-    }
-
     p.setup = function () {
-        p.pixelDensity(2);
+        p.pixelDensity(p.displayDensity());
         const p5canvas = p.createCanvas(400, 400);
         p5canvas.parent("avatarCanvasContainer");
         p.textFont("Montserrat");
 
+        // UI Listeners
         imageInput.addEventListener("change", handleFile);
         zoomSlider.addEventListener("input", () => p.redraw());
         textInput.addEventListener("input", () => p.redraw());
         downloadBtn.addEventListener("click", downloadAvatar);
 
+        openColorModalBtn.addEventListener("click", () => toggleModal(true));
+        closeModalBtn.addEventListener("click", () => toggleModal(false));
+        applyModalBtn.addEventListener("click", () => toggleModal(false));
+        undoModalBtn.addEventListener("click", restoreState);
+
+        textColorRow.addEventListener("click", (e) => {
+            if (e.target !== textColorPicker) {
+                textColorPicker.click();
+            }
+        });
+
+        textColorPicker.addEventListener("click", () => saveState());
+        textColorPicker.addEventListener("input", (e) => {
+            currentTextColor = e.target.value;
+            textColorLabel.textContent = currentTextColor.toUpperCase();
+            p.redraw();
+        });
+
         addRibbonColorBtn.addEventListener("click", () => {
-            saveState(); // Save before adding
+            saveState();
             const lastColor = ribbonColors[ribbonColors.length - 1] || "#000000";
             ribbonColors.push(lastColor);
             renderRibbonInputs();
@@ -180,6 +191,16 @@ const sketch = function (p) {
             p.redraw();
         });
 
+        if (fileUploadBtnLabel) {
+            fileUploadBtnLabel.addEventListener("mouseenter", () => {
+                fileUploadBtnLabel.style.backgroundColor = currentHoverBg;
+            });
+            fileUploadBtnLabel.addEventListener("mouseleave", () => {
+                fileUploadBtnLabel.style.backgroundColor = "transparent";
+            });
+        }
+
+        // Interaction Listeners
         p5canvas.elt.addEventListener("mousedown", startDrag);
         p5canvas.elt.addEventListener("touchstart", startDrag, { passive: false });
 
@@ -281,9 +302,7 @@ const sketch = function (p) {
             input.type = "color";
             input.value = color;
 
-            input.addEventListener("click", () => {
-                saveState();
-            });
+            input.addEventListener("click", () => saveState());
 
             input.addEventListener("input", (e) => {
                 ribbonColors[index] = e.target.value;
