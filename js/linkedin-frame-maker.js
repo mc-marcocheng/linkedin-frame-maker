@@ -475,7 +475,7 @@ const sketch = function (p) {
     }
 
     function drawPlaceholder(p) {
-        const placeholderBackground = getThemeToken("--color-canvas-mint", "#e7efe2");
+        const placeholderBackground = getThemeToken("--color-control-surface", "#f3f7f0");
         const placeholderText = getThemeToken("--color-muted", "#626a5f");
 
         p.noStroke();
