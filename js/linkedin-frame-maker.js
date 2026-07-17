@@ -1,3 +1,82 @@
+const frameMakerTheme = (() => {
+    const STORAGE_KEY = "frame-maker-theme";
+    const root = document.documentElement;
+    const themeToggle = document.getElementById("themeToggle");
+    const themeToggleIcon = document.getElementById("themeToggleIcon");
+    const themeToggleText = document.getElementById("themeToggleText");
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+
+    function getStoredTheme() {
+        try {
+            const storedTheme = localStorage.getItem(STORAGE_KEY);
+            return storedTheme === "light" || storedTheme === "dark" ? storedTheme : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function updateControl(theme) {
+        if (!themeToggle) return;
+
+        const isDark = theme === "dark";
+        const actionLabel = isDark ? "Switch to light mode" : "Switch to dark mode";
+
+        themeToggle.setAttribute("aria-label", actionLabel);
+        themeToggle.setAttribute("title", actionLabel);
+        themeToggle.setAttribute("aria-pressed", String(isDark));
+
+        if (themeToggleText) {
+            themeToggleText.textContent = isDark ? "Light mode" : "Dark mode";
+        }
+
+        if (themeToggleIcon) {
+            themeToggleIcon.className = isDark ? "bi bi-sun-fill" : "bi bi-moon-stars-fill";
+        }
+    }
+
+    function applyTheme(theme, persist = false) {
+        root.dataset.theme = theme;
+        root.style.colorScheme = theme;
+
+        if (persist) {
+            try {
+                localStorage.setItem(STORAGE_KEY, theme);
+            } catch (error) {
+                // Theme still works for the current page.
+            }
+        }
+
+        updateControl(theme);
+
+        window.dispatchEvent(
+            new CustomEvent("frame-maker:theme-change", {
+                detail: { theme },
+            })
+        );
+    }
+
+    themeToggle?.addEventListener("click", () => {
+        const nextTheme = root.dataset.theme === "dark" ? "light" : "dark";
+        applyTheme(nextTheme, true);
+    });
+
+    const handleSystemThemeChange = (event) => {
+        if (!getStoredTheme()) {
+            applyTheme(event.matches ? "dark" : "light");
+        }
+    };
+
+    if (typeof systemTheme.addEventListener === "function") {
+        systemTheme.addEventListener("change", handleSystemThemeChange);
+    } else {
+        systemTheme.addListener(handleSystemThemeChange);
+    }
+
+    updateControl(root.dataset.theme || "light");
+
+    return { applyTheme };
+})();
+
 const sketch = function (p) {
     // UI Elements
     const imageInput = document.getElementById("imageInput");
@@ -26,9 +105,8 @@ const sketch = function (p) {
     let startX, startY;
 
     // Default Colors
-    let ribbonColors = ["#d42426", "#2a9d8f"]; // Red, Teal
+    let ribbonColors = ["#245e36", "#a6f16c"];
     let currentTextColor = "#ffffff";
-    let currentHoverBg = "#fff0f0";
 
     // History
     const historyStack = [];
@@ -68,95 +146,90 @@ const sketch = function (p) {
     }
 
     // Modal Logic
-    function toggleModal(show) {
-        if (show) {
-            updateUndoBtnUI();
-            colorModal.classList.remove("tw-hidden");
-            setTimeout(() => {
-                colorModal.classList.add("open");
-                trapFocus(colorModal);
-            }, 10);
-        } else {
-            colorModal.classList.remove("open");
-            setTimeout(() => colorModal.classList.add("tw-hidden"), 200);
-            openColorModalBtn.focus();
+    let modalHideTimer = null;
+    let lastFocusedElement = null;
+
+    function getModalFocusableElements() {
+        return Array.from(
+            colorModal.querySelectorAll(
+                'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+            )
+        ).filter((element) => !element.hasAttribute("hidden"));
+    }
+
+    function handleModalKeydown(event) {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            toggleModal(false);
+            return;
+        }
+
+        if (event.key !== "Tab") return;
+
+        const focusableElements = getModalFocusableElements();
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey && document.activeElement === firstElement) {
+            event.preventDefault();
+            lastElement.focus();
+        } else if (!event.shiftKey && document.activeElement === lastElement) {
+            event.preventDefault();
+            firstElement.focus();
         }
     }
 
-    function trapFocus(modal) {
-        const focusableElements = modal.querySelectorAll(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        const firstFocusableElement = focusableElements[0];
-        const lastFocusableElement = focusableElements[focusableElements.length - 1];
+    function toggleModal(show) {
+        window.clearTimeout(modalHideTimer);
 
-        firstFocusableElement.focus();
+        if (show) {
+            lastFocusedElement = document.activeElement;
 
-        modal.addEventListener("keydown", function (e) {
-            if (e.key === "Tab") {
-                if (e.shiftKey) {
-                    if (document.activeElement === firstFocusableElement) {
-                        lastFocusableElement.focus();
-                        e.preventDefault();
-                    }
-                } else {
-                    if (document.activeElement === lastFocusableElement) {
-                        firstFocusableElement.focus();
-                        e.preventDefault();
-                    }
-                }
+            updateUndoBtnUI();
+            colorModal.classList.remove("tw-hidden");
+            colorModal.setAttribute("aria-hidden", "false");
+            document.body.classList.add("modal-open");
+
+            requestAnimationFrame(() => {
+                colorModal.classList.add("open");
+                closeModalBtn.focus();
+            });
+        } else {
+            colorModal.classList.remove("open");
+            colorModal.setAttribute("aria-hidden", "true");
+            document.body.classList.remove("modal-open");
+
+            modalHideTimer = window.setTimeout(() => {
+                colorModal.classList.add("tw-hidden");
+            }, 200);
+
+            if (lastFocusedElement instanceof HTMLElement) {
+                lastFocusedElement.focus();
+            } else {
+                openColorModalBtn.focus();
             }
-            if (e.key === "Escape") {
-                toggleModal(false);
-            }
-        });
+        }
     }
 
     function updateUITheme() {
-        if (ribbonColors.length === 0) return;
-
-        // Download Button Gradient
-        const gradientColors =
-            ribbonColors.length === 1
-                ? `${ribbonColors[0]}, ${ribbonColors[0]}`
-                : ribbonColors.join(", ");
-
-        if (downloadBtn) {
-            downloadBtn.style.background = `linear-gradient(45deg, ${gradientColors})`;
-        }
-
-        // UI Accents
-        const primaryColorStr = ribbonColors[0];
-
-        if (fileUploadBtnLabel) {
-            fileUploadBtnLabel.style.borderColor = primaryColorStr;
-            fileUploadBtnLabel.style.color = primaryColorStr;
-        }
-        if (zoomSlider) {
-            zoomSlider.style.accentColor = primaryColorStr;
-        }
-
-        if (textInput) {
-            textInput.style.setProperty("--active-border-color", primaryColorStr);
-            textInput.style.borderColor = "";
-        }
-
-        // Calculate Hover Background
-        try {
-            const primaryColor = p.color(primaryColorStr);
-            const white = p.color(255);
-            const lightTint = p.lerpColor(primaryColor, white, 0.92);
-            currentHoverBg = `rgba(${lightTint.levels[0]}, ${lightTint.levels[1]}, ${lightTint.levels[2]}, ${lightTint.levels[3] / 255})`;
-        } catch (e) {
-            currentHoverBg = "#f0f0f0";
-        }
+        // The application interface uses the stable signal-green design system.
+        // Ribbon colors only affect the generated frame.
+        downloadBtn.style.removeProperty("background");
+        fileUploadBtnLabel?.style.removeProperty("border-color");
+        fileUploadBtnLabel?.style.removeProperty("color");
+        fileUploadBtnLabel?.style.removeProperty("background-color");
+        zoomSlider?.style.removeProperty("accent-color");
+        textInput?.style.removeProperty("--active-border-color");
+        textInput?.style.removeProperty("border-color");
     }
 
     p.setup = function () {
         p.pixelDensity(p.displayDensity());
         const p5canvas = p.createCanvas(400, 400);
         p5canvas.parent("avatarCanvasContainer");
-        p.textFont("Montserrat");
+        p.textFont("Manrope");
 
         // UI Listeners
         imageInput.addEventListener("change", handleFile);
@@ -191,14 +264,13 @@ const sketch = function (p) {
             p.redraw();
         });
 
-        if (fileUploadBtnLabel) {
-            fileUploadBtnLabel.addEventListener("mouseenter", () => {
-                fileUploadBtnLabel.style.backgroundColor = currentHoverBg;
-            });
-            fileUploadBtnLabel.addEventListener("mouseleave", () => {
-                fileUploadBtnLabel.style.backgroundColor = "transparent";
-            });
-        }
+        colorModal.addEventListener("keydown", handleModalKeydown);
+
+        colorModal.addEventListener("click", (event) => {
+            if (event.target === colorModal) {
+                toggleModal(false);
+            }
+        });
 
         // Interaction Listeners
         p5canvas.elt.addEventListener("mousedown", startDrag);
@@ -209,6 +281,10 @@ const sketch = function (p) {
 
         window.addEventListener("mouseup", endDrag);
         window.addEventListener("touchend", endDrag);
+
+        window.addEventListener("frame-maker:theme-change", () => {
+            p.redraw();
+        });
 
         p5canvas.mouseWheel(handleScrollZoom);
 
@@ -392,12 +468,22 @@ const sketch = function (p) {
         }
     }
 
+    function getThemeToken(tokenName, fallback) {
+        const value = getComputedStyle(document.documentElement).getPropertyValue(tokenName).trim();
+
+        return value || fallback;
+    }
+
     function drawPlaceholder(p) {
-        p.fill(245);
-        p.rect(0, 0, p.width, p.height);
-        p.textStyle(p.NORMAL);
-        p.fill(180);
+        const placeholderBackground = getThemeToken("--color-canvas-mint", "#e7efe2");
+        const placeholderText = getThemeToken("--color-muted", "#626a5f");
+
         p.noStroke();
+        p.fill(placeholderBackground);
+        p.rect(0, 0, p.width, p.height);
+
+        p.textStyle(p.NORMAL);
+        p.fill(placeholderText);
         p.textAlign(p.CENTER, p.CENTER);
         p.textSize(16);
         p.text("No Image Selected", p.width / 2, p.height / 2);

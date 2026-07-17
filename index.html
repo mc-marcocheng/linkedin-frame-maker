@@ -3,6 +3,33 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+        <!-- Apply the theme before styles render to prevent flashing. -->
+        <script>
+            (() => {
+                let theme;
+
+                try {
+                    const storedTheme = localStorage.getItem("frame-maker-theme");
+
+                    if (storedTheme === "light" || storedTheme === "dark") {
+                        theme = storedTheme;
+                    }
+                } catch (error) {
+                    // Continue with the operating-system preference.
+                }
+
+                if (!theme) {
+                    theme = window.matchMedia("(prefers-color-scheme: dark)").matches
+                        ? "dark"
+                        : "light";
+                }
+
+                document.documentElement.dataset.theme = theme;
+                document.documentElement.style.colorScheme = theme;
+            })();
+        </script>
+
         <title>Marco Cheng - Frame Maker</title>
         <link rel="shortcut icon" href="./assets/icon.jpg" type="image/x-icon" />
 
@@ -16,27 +43,40 @@
             href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css"
         />
         <link
-            href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
             rel="stylesheet"
         />
     </head>
+
     <body
-        class="tw-flex tw-min-h-[100vh] tw-flex-col tw-items-center tw-justify-center tw-bg-[#f5f5f5] tw-font-mono tw-text-black"
+        class="frame-maker-page tw-flex tw-min-h-[100vh] tw-flex-col tw-items-center tw-justify-center"
     >
-        <div class="frame-maker-container">
-            <h1>Frame Maker</h1>
+        <button
+            id="themeToggle"
+            class="theme-toggle"
+            type="button"
+            aria-label="Switch to dark mode"
+            aria-pressed="false"
+        >
+            <i id="themeToggleIcon" class="bi bi-moon-stars-fill" aria-hidden="true"></i>
+            <span id="themeToggleText">Dark mode</span>
+        </button>
+
+        <main class="frame-maker-container">
+            <h1>Frame <span class="text-highlight">Maker</span></h1>
             <p>Upload your photo and customize your banner.</p>
 
-            <div id="avatarCanvasContainer"></div>
+            <div id="avatarCanvasContainer" aria-label="Frame preview"></div>
 
             <div class="controls">
                 <label class="file-upload-btn">
-                    <i class="bi bi-upload"></i> Upload Photo
+                    <i class="bi bi-upload" aria-hidden="true"></i>
+                    <span>Upload Photo</span>
                     <input type="file" id="imageInput" accept="image/*" />
                 </label>
 
                 <div class="control-group">
-                    <i class="bi bi-zoom-out"></i>
+                    <i class="bi bi-zoom-out" aria-hidden="true"></i>
                     <input
                         type="range"
                         id="zoomSlider"
@@ -46,7 +86,7 @@
                         value="1"
                         aria-label="Zoom photo"
                     />
-                    <i class="bi bi-zoom-in"></i>
+                    <i class="bi bi-zoom-in" aria-hidden="true"></i>
                 </div>
 
                 <div class="input-with-settings">
@@ -56,61 +96,103 @@
                         placeholder="#MERRYCHRISTMAS"
                         value="#MERRYCHRISTMAS"
                         maxlength="25"
+                        aria-label="Frame text"
                     />
-                    <button id="openColorModalBtn" class="settings-btn" title="Customize Colors">
-                        <i class="bi bi-palette-fill"></i>
+
+                    <button
+                        id="openColorModalBtn"
+                        class="settings-btn"
+                        type="button"
+                        title="Customize colors"
+                        aria-label="Customize frame colors"
+                    >
+                        <i class="bi bi-palette-fill" aria-hidden="true"></i>
                     </button>
                 </div>
 
                 <div>
-                    <button id="downloadBtn">Download PNG</button>
-                    <p class="tw-text-gray-400 tw-mt-2" style="font-size: 10px; margin-bottom: 0">
-                        No images will be retained.
-                    </p>
+                    <button id="downloadBtn" type="button">
+                        <i class="bi bi-download" aria-hidden="true"></i>
+                        Download PNG
+                    </button>
+
+                    <p class="privacy-note">No images will be retained.</p>
                 </div>
             </div>
-        </div>
+        </main>
 
-        <div id="colorModal" class="modal-overlay tw-hidden">
+        <div
+            id="colorModal"
+            class="modal-overlay tw-hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-hidden="true"
+            aria-labelledby="colorModalTitle"
+        >
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2>Customize Colors</h2>
-                    <button id="closeModalBtn" class="close-modal-btn">
-                        <i class="bi bi-x-lg"></i>
+                    <h2 id="colorModalTitle">Customize Colors</h2>
+
+                    <button
+                        id="closeModalBtn"
+                        class="close-modal-btn"
+                        type="button"
+                        aria-label="Close color settings"
+                    >
+                        <i class="bi bi-x-lg" aria-hidden="true"></i>
                     </button>
                 </div>
 
                 <div class="modal-body">
                     <div class="setting-section">
-                        <label>Text Color</label>
+                        <label for="textColorPicker">Text Color</label>
+
                         <div class="color-picker-row" id="textColorRow">
-                            <input type="color" id="textColorPicker" value="#ffffff" />
-                            <span id="textColorLabel" class="color-label-text">#FFFFFF</span>
+                            <input
+                                type="color"
+                                id="textColorPicker"
+                                value="#ffffff"
+                                aria-label="Frame text color"
+                            />
+                            <span id="textColorLabel" class="color-label-text"> #FFFFFF </span>
                         </div>
                     </div>
 
-                    <hr class="tw-my-4 tw-border-gray-200" />
+                    <hr />
 
                     <div class="setting-section">
                         <label>Ribbon Gradient Colors</label>
-                        <p class="tw-mb-2 tw-text-xs tw-text-gray-500">
-                            Add multiple colors to create a gradient.
-                        </p>
+                        <p class="setting-help">Add multiple colors to create a gradient.</p>
 
-                        <div id="ribbonColorsList" class="tw-flex tw-flex-col tw-gap-2"></div>
+                        <div id="ribbonColorsList" class="ribbon-colors-list"></div>
 
-                        <button id="addRibbonColorBtn" class="add-color-btn tw-mt-3">
-                            <i class="bi bi-plus-circle"></i> Add Color
+                        <button id="addRibbonColorBtn" class="add-color-btn" type="button">
+                            <i class="bi bi-plus-circle" aria-hidden="true"></i>
+                            Add Color
                         </button>
                     </div>
                 </div>
 
                 <div class="modal-footer">
-                    <button id="undoModalBtn" class="undo-btn" title="Undo Last Action" disabled>
-                        <i class="bi bi-arrow-counterclockwise"></i>
+                    <button
+                        id="undoModalBtn"
+                        class="undo-btn"
+                        type="button"
+                        title="Undo last action"
+                        aria-label="Undo last color change"
+                        disabled
+                    >
+                        <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
                     </button>
-                    <button id="applyModalBtn" class="apply-btn" title="Apply Changes">
-                        <i class="bi bi-check-lg"></i>
+
+                    <button
+                        id="applyModalBtn"
+                        class="apply-btn"
+                        type="button"
+                        title="Apply changes"
+                        aria-label="Apply color changes"
+                    >
+                        <i class="bi bi-check-lg" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
